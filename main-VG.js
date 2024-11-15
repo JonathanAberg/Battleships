@@ -70,6 +70,13 @@ Array.prototype.contains = function (value) {
   return this.includes(value);
 };
 
+// Function to get a random tile
+function getRandomTile() {
+  const row = Math.floor(Math.random() * rows);
+  const col = Math.floor(Math.random() * cols);
+  return { row, col };
+}
+
 ///////////////////// DOM functions /////////////////////////////
 
 // displays in DOM node announcer a text message and removes .hide class
@@ -270,14 +277,10 @@ function switchPlayers(players) {
 
 // handles the "Next player" button click event
 function handleNextPlayerClick() {
-  if (targetChoosen) {
-    targetChoosen = false;
-    gameLoop();
-  } else {
-    alert("You must choose a tile to shoot first");
-  }
+  // Remove the check for the targetChoosen flag
+  // Call the gameLoop() function without any conditions
+  gameLoop();
 }
-
 // stops the game and announces the winner
 function stopGame() {
   displayGameOver(players.current, players.enemy);
@@ -289,21 +292,116 @@ function stopGame() {
 // handles a tile click event and registers the guess
 function handleTileClick(evt) {
   const guess = getCoordinates(evt.target);
+
+  // Register player's guess
   registerHitOrBom(guess, players.enemy);
+
+  // Display player's hits and misses
   displayHitsAndBoms(players.enemy);
-  tiles.forEach((tile) => tile.removeEventListener("click", handleTileClick));
+
   if (hasLost(players.enemy)) {
     stopGame();
   } else {
     players = switchPlayers(players);
-    targetChoosen = true;
+    gameLoop();
   }
 }
 
 // runs the game loop for each turn
 function gameLoop() {
+  // Display the current player's turn
   displayTurn(players.current);
-  displayHitsAndBoms(players.enemy);
+
+  // Player continues to guess until they hit or miss
+  playerGuessLoop(players.current);
+}
+
+// Player continues to guess until they hit or miss
+function playerGuessLoop(player) {
+  // Event listener function for tile click
+  function handleTileClick(evt) {
+    const guess = getCoordinates(evt.target);
+
+    // Register player's guess
+    registerHitOrBom(guess, player);
+
+    // Display player's hits and misses
+    displayHitsAndBoms(player);
+
+    // Check if player has lost the game
+    if (hasLost(player)) {
+      // Stop the game and announce the winner
+      stopGame();
+    } else {
+      // Remove the event listener for tile click
+      tiles.forEach((tile) =>
+        tile.removeEventListener("click", handleTileClick)
+      );
+
+      // Next player continues to guess until they hit or miss
+      gameLoop();
+    }
+  }
+
+  // Add event listeners to the tile elements for the click event
+  tiles.forEach((tile) => tile.addEventListener("click", handleTileClick));
+}
+
+// runs the game loop for each turn
+function gameLoop() {
+  // Switch players
+  players = switchPlayers(players);
+
+  // Display the current player's turn
+  displayTurn(players.current);
+
+  // Player continues to guess until they hit or miss
+  playerGuessLoop(players.current);
+}
+
+// Player continues to guess until they hit or miss
+function playerGuessLoop(player) {
+  let guess;
+
+  // Event listener function for tile click
+  function handleTileClick(evt) {
+    const tile = evt.target;
+    guess = getCoordinates(tile);
+
+    // Register player's guess
+    registerHitOrBom(guess, players.enemy);
+
+    // Display player's hits and misses
+    displayHitsAndBoms(players.enemy);
+
+    // Check if player has lost the game
+    if (hasLost(players.enemy)) {
+      // Stop the game and announce the winner
+      stopGame();
+    } else {
+      // Remove the event listener for tile click
+      tiles.forEach((tile) =>
+        tile.removeEventListener("click", handleTileClick)
+      );
+
+      // Switch players
+      players = switchPlayers(players);
+
+      // Display the current player's turn
+      displayTurn(players.current);
+
+      // Check if it's the same player's turn again
+      if (players.current === player) {
+        // Player continues to guess until they hit or miss
+        playerGuessLoop(player);
+      } else {
+        // Next player continues to guess until they hit or miss
+        gameLoop();
+      }
+    }
+  }
+
+  // Add event listeners to the tile elements for the click event
   tiles.forEach((tile) => tile.addEventListener("click", handleTileClick));
 }
 
