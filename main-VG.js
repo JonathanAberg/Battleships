@@ -162,7 +162,10 @@ function displayHitsAndBoms(player) {
     ...coord,
     mark: player.mark,
   }));
-  const markedBoms = player.boms.map((coord) => ({ ...coord, mark: "X" }));
+  const markedBoms = player.boms.map((coord) => ({
+    ...coord,
+    mark: "X",
+  }));
   displayMarkersOnGrid([...markedHits, ...markedBoms]);
 }
 
@@ -185,17 +188,29 @@ function glowShip(ship, ms) {
 
 // determines if a ship is valid or not based on length and coordinates
 function isValidShip(ship) {
+  // Check length requirements (2-5 cells)
   if (ship.length < 2 || ship.length > 5) return false;
 
-  let sameRow = true;
-  let sameCol = true;
+  // check if ship is in a straight line (horizontal or vertical)
+  const isHorizontal = ship.every((coord) => coord.row === ship[0].row);
+  const isVertical = ship.every((coord) => coord.col === ship[0].col);
 
-  for (let i = 1; i < ship.length; i++) {
-    if (ship[i].row !== ship[0].row) sameRow = false;
-    if (ship[i].col !== ship[0].col) sameCol = false;
+  if (!isHorizontal && !isVertical) return false;
+
+  // Sort coordinates
+  const coords = isHorizontal
+    ? [...ship].sort((a, b) => a.col - b.col)
+    : [...ship].sort((a, b) => a.row - b.row);
+
+  // Check for consecutive coordinates (no gaps)
+  for (let i = 1; i < coords.length; i++) {
+    const diff = isHorizontal
+      ? coords[i].col - coords[i - 1].col
+      : coords[i].row - coords[i - 1].row;
+    if (diff !== 1) return false;
   }
 
-  return sameRow || sameCol; // Return true if in the same row or column
+  return true;
 }
 
 // Initializes player ships and calls callback when done
@@ -275,12 +290,6 @@ function switchPlayers(players) {
   return { current: players.enemy, enemy: players.current };
 }
 
-// handles the "Next player" button click event
-function handleNextPlayerClick() {
-  // Remove the check for the targetChoosen flag
-  // Call the gameLoop() function without any conditions
-  gameLoop();
-}
 // stops the game and announces the winner
 function stopGame() {
   displayGameOver(players.current, players.enemy);
@@ -291,118 +300,53 @@ function stopGame() {
 
 // handles a tile click event and registers the guess
 function handleTileClick(evt) {
-  const guess = getCoordinates(evt.target);
+  const tile = evt.target;
+  const guess = getCoordinates(tile);
 
-  // Register player's guess
+  // Check if this coordinate was already guessed
+  if (
+    players.enemy.hits.some(
+      (hit) => hit.row === guess.row && hit.col === guess.col
+    ) ||
+    players.enemy.boms.some(
+      (bom) => bom.row === guess.row && bom.col === guess.col
+    )
+  ) {
+    return; // Ignore clicks on already guessed coordinates
+  }
+
+  // Remove event listeners to prevent multple clicks
+  tiles.forEach((tile) => tile.removeEventListener("click", handleTileClick));
+
+  // Register guess and update display
   registerHitOrBom(guess, players.enemy);
-
-  // Display player's hits and misses
   displayHitsAndBoms(players.enemy);
 
   if (hasLost(players.enemy)) {
     stopGame();
   } else {
+    // Switch players
     players = switchPlayers(players);
-    gameLoop();
-  }
-}
-
-// runs the game loop for each turn
-function gameLoop() {
-  // Display the current player's turn
-  displayTurn(players.current);
-
-  // Player continues to guess until they hit or miss
-  playerGuessLoop(players.current);
-}
-
-// Player continues to guess until they hit or miss
-function playerGuessLoop(player) {
-  // Event listener function for tile click
-  function handleTileClick(evt) {
-    const guess = getCoordinates(evt.target);
-
-    // Register player's guess
-    registerHitOrBom(guess, player);
-
-    // Display player's hits and misses
-    displayHitsAndBoms(player);
-
-    // Check if player has lost the game
-    if (hasLost(player)) {
-      // Stop the game and announce the winner
-      stopGame();
-    } else {
-      // Remove the event listener for tile click
-      tiles.forEach((tile) =>
-        tile.removeEventListener("click", handleTileClick)
-      );
-
-      // Next player continues to guess until they hit or miss
+    // Start next turn
+    setTimeout(() => {
+      clearGrid();
       gameLoop();
-    }
+    }, 1000); // Add a small delay for better user experience
   }
-
-  // Add event listeners to the tile elements for the click event
-  tiles.forEach((tile) => tile.addEventListener("click", handleTileClick));
 }
 
 // runs the game loop for each turn
 function gameLoop() {
-  // Switch players
-  players = switchPlayers(players);
-
   // Display the current player's turn
   displayTurn(players.current);
 
-  // Player continues to guess until they hit or miss
-  playerGuessLoop(players.current);
-}
+  // Display current player's previous hits and misses
+  displayHitsAndBoms(players.enemy);
 
-// Player continues to guess until they hit or miss
-function playerGuessLoop(player) {
-  let guess;
-
-  // Event listener function for tile click
-  function handleTileClick(evt) {
-    const tile = evt.target;
-    guess = getCoordinates(tile);
-
-    // Register player's guess
-    registerHitOrBom(guess, players.enemy);
-
-    // Display player's hits and misses
-    displayHitsAndBoms(players.enemy);
-
-    // Check if player has lost the game
-    if (hasLost(players.enemy)) {
-      // Stop the game and announce the winner
-      stopGame();
-    } else {
-      // Remove the event listener for tile click
-      tiles.forEach((tile) =>
-        tile.removeEventListener("click", handleTileClick)
-      );
-
-      // Switch players
-      players = switchPlayers(players);
-
-      // Display the current player's turn
-      displayTurn(players.current);
-
-      // Check if it's the same player's turn again
-      if (players.current === player) {
-        // Player continues to guess until they hit or miss
-        playerGuessLoop(player);
-      } else {
-        // Next player continues to guess until they hit or miss
-        gameLoop();
-      }
-    }
-  }
-
-  // Add event listeners to the tile elements for the click event
-  tiles.forEach((tile) => tile.addEventListener("click", handleTileClick));
+  // Add event listeners for the current player's turn
+  tiles.forEach((tile) => {
+    tile.addEventListener("click", handleTileClick);
+  });
 }
 
 ///////////////////// Game start //////////////////////////
@@ -410,8 +354,6 @@ function playerGuessLoop(player) {
 function runGame() {
   initializeShips(player1, () => {
     initializeShips(player2, () => {
-      button.innerHTML = "Next player";
-      button.addEventListener("click", handleNextPlayerClick);
       clearAnnounce();
       gameLoop();
     });
